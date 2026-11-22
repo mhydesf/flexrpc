@@ -1,0 +1,28 @@
+{
+    "name": "flexRPC",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": "."
+    },
+    "remoteUser": "aarch64",
+    "containerUser": "aarch64",
+    "updateRemoteUserUID": true,
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+    "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+    "capAdd": [
+        "SYS_PTRACE"
+    ],
+    "securityOpt": [
+        "seccomp=unconfined"
+    ],
+    "runArgs": [
+        "--hostname=aarch64",
+        "--init",
+        "--network=host"
+    ],
+    "containerEnv": {
+        "TERM": "xterm-256color",
+        "COLORTERM": "truecolor",
+        "QEMU_LD_PREFIX": "/usr/aarch64-linux-gnu"
+    }
+}

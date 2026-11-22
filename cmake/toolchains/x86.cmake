@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.20)
+
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR x86_64)
+
+set(CMAKE_C_COMPILER /usr/bin/gcc-15)
+set(CMAKE_CXX_COMPILER /usr/bin/g++-15)
+set(CMAKE_AR /usr/bin/gcc-ar-15)
+set(CMAKE_NM /usr/bin/gcc-nm-15)
+set(CMAKE_RANLIB /usr/bin/gcc-ranlib-15)
+
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)

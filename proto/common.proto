@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+enum Command {
+  NONE = 0;
+  DISCOVER = 1;
+  HEARTBEAT = 2;
+  CAPABILITIES = 3;
+}
+
+message Header {
+  uint32 id = 1;
+  Command cmd = 2;
+  bytes payload = 3;
+}
