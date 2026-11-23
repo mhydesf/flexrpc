@@ -3,67 +3,75 @@
 #include <unistd.h>
 
 #include <cstdint>
-#include <span>
 #include <functional>
+#include <span>
+
+#include <concepts.h>
 
 namespace flexrpc {
 
-class ServiceBase;
-
 // TTP for free handlers
+// requires the method is of appropriate shape
 template <typename FnT>
 concept FreeHandlerT = requires(FnT fn, std::span<const uint8_t> req, std::span<uint8_t> resp) {
     { std::invoke(fn, req, resp) } -> std::same_as<ssize_t>;
 };
 
-// TTP for derived ServiceBase types
-template <typename T>
-concept ServiceT = std::derived_from<T, ServiceBase>;
-
 // TTP for ServiceT handlers
+// requires the method is of appropriate shape and belongs to an instance derived from ServiceBase
 template <typename FnT, typename S>
-concept SrvHandlerT = ServiceT<S> && requires(FnT fn, S* srv, std::span<const uint8_t> req, std::span<uint8_t> resp) {
+concept SrvHandlerT = utilities::ServiceT<S> && requires(FnT fn, S* srv, std::span<const uint8_t> req, std::span<uint8_t> resp) {
     { std::invoke(fn, srv, req, resp) } -> std::same_as<ssize_t>;
 };
 
 class FlexMethod {
 public:
-    // Bind ServiceBase::Method to flex method
+    uint32_t id() const { return id_; }
+    ssize_t invoke(std::span<const uint8_t> req, std::span<uint8_t> resp) { return method_(service_, req, resp); }
+    void* service() const { return service_; }
+
     // TODO: ewww - decltype
-    template <auto Fn, ServiceT S> requires SrvHandlerT<decltype(Fn), S>
+    template <auto Fn, utilities::ServiceT S> requires SrvHandlerT<decltype(Fn), S>
     static constexpr FlexMethod bind(uint32_t id, S* srv) {
-        return FlexMethod{
-            id,
-            srv,
-            [](ServiceBase* srv, std::span<const uint8_t> req, std::span<uint8_t> resp) -> ssize_t {
+        return FlexMethod{{
+            .id = id,
+            .service = srv,
+            .method = [](void* srv, std::span<const uint8_t> req, std::span<uint8_t> resp) -> ssize_t {
                 return (static_cast<S*>(srv)->*Fn)(req, resp);
-            }
+            }}
         };
     }
 
-    // Bind ::Method to flex method
     template <FreeHandlerT auto Fn>
     static constexpr FlexMethod bind(uint32_t id) {
-        return FlexMethod{
-            id,
-            nullptr,
-            [](ServiceBase*, std::span<const uint8_t> req, std::span<uint8_t> resp) -> ssize_t {
+        return FlexMethod{{
+            .id = id,
+            .service = nullptr,
+            .method = [](void*, std::span<const uint8_t> req, std::span<uint8_t> resp) -> ssize_t {
                 return Fn(req, resp);
-            }
+            }}
         };
     }
 
-private:
-    using HandlerFn = ssize_t (*)(ServiceBase*, std::span<const uint8_t>, std::span<uint8_t>);
+    constexpr FlexMethod() = default;
 
-    constexpr FlexMethod(uint32_t id, ServiceBase* srv, HandlerFn method)
-        : id_{id}
-        , instance_{srv}
-        , method_{method} {}
+private:
+    using HandlerFn = ssize_t (*)(void*, std::span<const uint8_t>, std::span<uint8_t>);
+
+    struct MethodParams {
+        uint32_t id;
+        void* service;
+        HandlerFn method;
+    };
+
+    constexpr FlexMethod(MethodParams params)
+        : id_{params.id}
+        , service_{params.service}
+        , method_{params.method} {}
 
 private:
     uint32_t id_{0};
-    ServiceBase* instance_{nullptr};
+    void* service_{nullptr};
     HandlerFn method_{nullptr};
 };
 
