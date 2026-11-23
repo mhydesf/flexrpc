@@ -6,9 +6,13 @@
 #include <functional>
 #include <span>
 
-#include <concepts.h>
-
 namespace flexrpc {
+
+class ServiceBase;
+
+// TTP for derived ServiceBase types
+template <typename T>
+concept ServiceT = std::derived_from<T, ServiceBase>;
 
 // TTP for free handlers
 // requires the method is of appropriate shape
@@ -20,18 +24,18 @@ concept FreeHandlerT = requires(FnT fn, std::span<const uint8_t> req, std::span<
 // TTP for ServiceT handlers
 // requires the method is of appropriate shape and belongs to an instance derived from ServiceBase
 template <typename FnT, typename S>
-concept SrvHandlerT = utilities::ServiceT<S> && requires(FnT fn, S* srv, std::span<const uint8_t> req, std::span<uint8_t> resp) {
+concept SrvHandlerT = ServiceT<S> && requires(FnT fn, S* srv, std::span<const uint8_t> req, std::span<uint8_t> resp) {
     { std::invoke(fn, srv, req, resp) } -> std::same_as<ssize_t>;
 };
 
 class FlexMethod {
 public:
-    uint32_t id() const { return id_; }
-    ssize_t invoke(std::span<const uint8_t> req, std::span<uint8_t> resp) { return method_(service_, req, resp); }
-    void* service() const { return service_; }
+    constexpr uint32_t id() const { return id_; }
+    constexpr ssize_t invoke(std::span<const uint8_t> req, std::span<uint8_t> resp) { return method_(service_, req, resp); }
+    constexpr void* service() const { return service_; }
 
     // TODO: ewww - decltype
-    template <auto Fn, utilities::ServiceT S> requires SrvHandlerT<decltype(Fn), S>
+    template <auto Fn, ServiceT S> requires SrvHandlerT<decltype(Fn), S>
     static constexpr FlexMethod bind(uint32_t id, S* srv) {
         return FlexMethod{{
             .id = id,

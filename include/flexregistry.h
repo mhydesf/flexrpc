@@ -11,6 +11,7 @@ public:
     constexpr Registry() = default;
 
     constexpr void register_method(FlexMethod method) {
+        if (method.id() >= MAX_REGISTRY_METHODS) { return; }
         auto& entry = registry_.at(method.id());
         // if already valid don't overwrite entry
         if (entry.is_valid()) { return; }
@@ -32,8 +33,9 @@ public:
     }
 
     ssize_t invoke(uint32_t id, std::span<const uint8_t> req, std::span<uint8_t> resp) {
+        if (id >= MAX_REGISTRY_METHODS) { return -1; }
         auto& entry = registry_.at(id);
-        if (id >= MAX_REGISTRY_METHODS || !entry.is_valid()) { return -1; }
+        if (!entry.is_valid()) { return -2; }
         return registry_.at(id).method.invoke(req, resp);
     }
 

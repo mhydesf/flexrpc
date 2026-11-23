@@ -7,27 +7,13 @@
 #include <flexregistry.h>
 #include <flexrpc_proto/common.pb.h>
 
-class Test : public flexrpc::ServiceBase<Test> {
-public:
-    constexpr Test(flexrpc::Registry& registry) : ServiceBase {registry} {
-        bind<&Test::handle>(3);
-    }
-
-    ssize_t handle(std::span<const uint8_t>, std::span<uint8_t>) { return 0; }
-};
-
-constexpr ssize_t handle(std::span<const uint8_t>, std::span<uint8_t>) { return 0; }
-
 int main() {
     flexrpc::Registry registry{};
+    flexrpc::SystemService sys{registry};
+    sys.init();
 
-    auto fn = [](std::span<const uint8_t> req, std::span<uint8_t> resp) -> ssize_t {
-        return 0;
-    };
-    flexrpc::FlexMethod free_method = flexrpc::FlexMethod::bind<fn>(1);
-    flexrpc::FlexMethod free_two = flexrpc::FlexMethod::bind<handle>(2);
-
-    Test t{registry};
+    registry.invoke(0, {}, {});
+    registry.invoke(1, {}, {});
 
     std::array<uint8_t, sizeof(Header)> buffer{};
 
