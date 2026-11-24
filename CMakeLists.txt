@@ -12,6 +12,10 @@ if(NOT CPM_SOURCE_CACHE)
         CACHE STRING "CPM Cache Dir")
 endif()
 
+# TODO: This is temporary to keep protobuf small - need a codec transport layer
+add_compile_options(-ffunction-sections -fdata-sections)
+add_link_options(-Wl,--gc-sections $<$<CONFIG:Release>:-s>)
+
 include(CPM)
 include(protobuf)
 

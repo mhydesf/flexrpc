@@ -45,7 +45,7 @@ private:
     }
 
 private:
-    static constexpr uint32_t MAX_REGISTRY_METHODS = 512;
+    static constexpr uint32_t MAX_REGISTRY_METHODS = 4096;
 
     enum class EntryState : uint8_t {
         UNINITIALIZED = 0,

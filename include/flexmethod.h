@@ -8,23 +8,22 @@
 
 namespace flexrpc {
 
-class ServiceBase;
+// FlexMethods are free functions or members of a FlexServiceBase
+// derived class
+class FlexServiceBase;
 
-// TTP for derived ServiceBase types
 template <typename T>
-concept ServiceT = std::derived_from<T, ServiceBase>;
+concept ServiceT = std::derived_from<T, FlexServiceBase>;
 
-// TTP for free handlers
-// requires the method is of appropriate shape
-template <typename FnT>
-concept FreeHandlerT = requires(FnT fn, std::span<const uint8_t> req, std::span<uint8_t> resp) {
+template <typename FnT, typename Req, typename Resp>
+concept FreeHandlerT = requires(FnT fn, const Req& req, Resp& resp) {
     { std::invoke(fn, req, resp) } -> std::same_as<ssize_t>;
 };
 
 // TTP for ServiceT handlers
-// requires the method is of appropriate shape and belongs to an instance derived from ServiceBase
-template <typename FnT, typename S>
-concept SrvHandlerT = ServiceT<S> && requires(FnT fn, S* srv, std::span<const uint8_t> req, std::span<uint8_t> resp) {
+// requires the method is of appropriate shape and belongs to an instance derived from FlexServiceBase
+template <typename FnT, typename Req, typename Resp, typename S>
+concept SrvHandlerT = ServiceT<S> && requires(FnT fn, S* srv, const Req& req, Resp& resp) {
     { std::invoke(fn, srv, req, resp) } -> std::same_as<ssize_t>;
 };
 
@@ -34,29 +33,35 @@ public:
     constexpr ssize_t invoke(std::span<const uint8_t> req, std::span<uint8_t> resp) { return method_(service_, req, resp); }
     constexpr void* service() const { return service_; }
 
-    // TODO: ewww - decltype
-    template <auto Fn, ServiceT S> requires SrvHandlerT<decltype(Fn), S>
+    // bind methods from a class derived from FlexServiceBase
+    template <typename Req, typename Resp, ServiceT S, SrvHandlerT<Req, Resp, S> auto Fn>
     static constexpr FlexMethod bind(uint32_t id, S* srv) {
         return FlexMethod{{
             .id = id,
             .service = srv,
-            .method = [](void* srv, std::span<const uint8_t> req, std::span<uint8_t> resp) -> ssize_t {
-                return (static_cast<S*>(srv)->*Fn)(req, resp);
+            .method = [](void* srv, std::span<const uint8_t> req_raw, std::span<uint8_t> resp_raw) -> ssize_t {
+                return executive<Req, Resp>(req_raw, resp_raw, [srv](const Req& req, Resp& resp) {
+                    return (static_cast<S*>(srv) ->*Fn)(req, resp);
+                });
             }}
         };
     }
 
-    template <FreeHandlerT auto Fn>
+    // bind free methods like static functions or generic lambdas
+    template <typename Req, typename Resp, FreeHandlerT<Req, Resp> auto Fn>
     static constexpr FlexMethod bind(uint32_t id) {
         return FlexMethod{{
             .id = id,
             .service = nullptr,
-            .method = [](void*, std::span<const uint8_t> req, std::span<uint8_t> resp) -> ssize_t {
-                return Fn(req, resp);
+            .method = [](void*, std::span<const uint8_t> req_raw, std::span<uint8_t> resp_raw) -> ssize_t {
+                return executive<Req, Resp>(req_raw, resp_raw, [](const Req& req, Resp& resp) {
+                    return Fn(req, resp);
+                });
             }}
         };
     }
 
+    // TODO: delete this
     constexpr FlexMethod() = default;
 
 private:
@@ -72,6 +77,26 @@ private:
         : id_{params.id}
         , service_{params.service}
         , method_{params.method} {}
+
+    template <typename Req, typename Resp, typename CallFn>
+    static constexpr ssize_t executive(std::span<const uint8_t> req_raw, std::span<uint8_t> resp_raw, CallFn call) {
+        Req req{};
+        if (!req.ParseFromArray(req_raw.data(), req_raw.size())) {
+            return -1;
+        }
+
+        Resp resp{};
+        if (!call(req, resp)) {
+            return -2;
+        }
+
+        const size_t out_len = resp.ByteSizeLong();
+        if (out_len > resp_raw.size() || !resp.SerializeToArray(resp_raw.data(), out_len)) {
+            return -3;
+        }
+
+        return static_cast<ssize_t>(out_len);
+    }
 
 private:
     uint32_t id_{0};

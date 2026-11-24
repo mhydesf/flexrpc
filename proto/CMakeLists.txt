@@ -8,7 +8,8 @@ add_library(flexrpc-proto STATIC
 target_link_libraries(
     flexrpc-proto
     PUBLIC
-        protobuf::libprotobuf
+        protobuf::libprotobuf-lite
+        utf8_validity
     )
 target_include_directories(
     flexrpc-proto

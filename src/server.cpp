@@ -9,11 +9,7 @@
 
 int main() {
     flexrpc::Registry registry{};
-    flexrpc::SystemService sys{registry};
-    sys.init();
-
-    registry.invoke(0, {}, {});
-    registry.invoke(1, {}, {});
+    flexrpc::SystemService sys{};
 
     std::array<uint8_t, sizeof(Header)> buffer{};
 
